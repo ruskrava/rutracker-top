@@ -27,7 +27,7 @@ def parse_page(html: str) -> list[tuple[str, int]]:
                 td[1]
                 .select_one("a.torTopic")
                 .get_text(strip=True)
-                .split("/")[0]
+                .split("/")[0].strip()
             )
             stats = td[3].find_all("p")
             downloads = int(stats[1].get_text(strip=True).replace(",", ""))
