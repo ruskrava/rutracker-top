@@ -15,6 +15,7 @@ def test_forums_list_and_reset():
     assert data["items"] == 0
 
 def test_delete_nonexistent_forum():
-    r = client.delete("/forum", params={"url": "https://example.com"})
+    url = "https://rutracker.org/forum/viewforum.php?f=999999"
+    r = client.delete("/forum", params={"url": url})
     assert r.status_code == 200
     assert r.json()["status"] == "not_found"

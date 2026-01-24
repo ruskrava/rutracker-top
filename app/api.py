@@ -4,6 +4,7 @@ import threading
 import pickle
 import os
 import time
+import re
 
 app = FastAPI(title="Rutracker Top API")
 
@@ -18,6 +19,18 @@ os.makedirs("data", exist_ok=True)
 # Scheduler config (ENV-based, docker-friendly)
 SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
 SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "3600"))
+
+
+def validate_forum_url(url: str) -> bool:
+    if not isinstance(url, str) or not url:
+        return False
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return False
+    if "rutracker.org/forum/" not in url:
+        return False
+    if re.search(r"[?&]f=\d+", url):
+        return True
+    return False
 
 
 def rebuild_global():
@@ -94,6 +107,8 @@ def scheduler_loop():
 
 @app.post("/parse")
 def start_parse(url: str = Query(..., description="Forum URL")):
+    if not validate_forum_url(url):
+        return {"status": "error", "message": "invalid forum url"}
     if STATUS == "running":
         return {"status": STATUS, "message": "Already running"}
     threading.Thread(target=background_parse, args=(url,), daemon=True).start()
@@ -145,6 +160,8 @@ def list_forums():
 
 @app.delete("/forum")
 def delete_forum(url: str):
+    if not validate_forum_url(url):
+        return {"status": "error", "message": "invalid forum url"}
     if url not in DATA["forums"]:
         return {"status": "not_found", "url": url}
     del DATA["forums"][url]
@@ -193,6 +210,4 @@ def schedule_disable():
 
 
 load_cache()
-
-# start scheduler thread (always running, behavior controlled via flags)
 threading.Thread(target=scheduler_loop, daemon=True).start()
