@@ -73,10 +73,10 @@ async function loadForums() {
   const list = qs("forums-list");
   if (!list) return;
 
-  const forums = await api("/forums");
+  const data = await api("/forums");
   list.innerHTML = "";
 
-  forums.forEach(url => {
+  data.forums.forEach(url => {
     const li = document.createElement("li");
     li.innerHTML = `
       ${url}
