@@ -37,6 +37,43 @@ def parse_page(html: str) -> list[tuple[str, int]]:
 
     return result
 
+
+def parse_page_with_link(html: str) -> list[tuple[str, int, str]]:
+
+    soup = BeautifulSoup(html, "lxml")
+
+    rows = soup.select("tr.hl-tr")
+
+    result = []
+
+
+
+    for tr in rows:
+
+        try:
+
+            td = tr.find_all("td")
+
+            a = td[1].select_one("a.torTopic")
+
+            title = a.get_text(strip=True).split("/")[0].strip()
+
+            link = "https://rutracker.org/forum/" + a.get("href")
+
+            stats = td[3].find_all("p")
+
+            downloads = int(stats[1].get_text(strip=True).replace(",", ""))
+
+            result.append((title, downloads, link))
+
+        except Exception:
+
+            continue
+
+
+
+    return result
+
 def detect_total_pages(base_url: str) -> int:
     session = requests.Session()
     session.headers.update(HEADERS)
@@ -77,3 +114,29 @@ def parse_forum(base_url: str) -> dict[str, int]:
                 films[title] += downloads
 
     return dict(films)
+
+def parse_forum_with_topics(base_url: str) -> dict[str, dict]:
+    session = requests.Session()
+    session.headers.update(HEADERS)
+
+    total_pages = detect_total_pages(base_url)
+    films: dict[str, dict] = {}
+
+    def worker(page: int):
+        start = (page - 1) * PER_PAGE
+        url = f"{base_url}&start={start}"
+        html = get_html(session, url)
+        return parse_page_with_link(html)
+
+    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        futures = [executor.submit(worker, p) for p in range(1, total_pages + 1)]
+        for f in as_completed(futures):
+            for title, downloads, link in f.result():
+                if title not in films:
+                    films[title] = {"downloads": 0, "topics": []}
+                films[title]["downloads"] += downloads
+                films[title]["topics"].append(
+                    {"url": link, "downloads": downloads}
+                )
+
+    return films
