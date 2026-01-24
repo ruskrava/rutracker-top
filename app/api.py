@@ -27,6 +27,8 @@ LAST_URL = None
 
 DATA_PATH = "data/cache.pkl"
 
+os.makedirs("data", exist_ok=True)
+
 
 
 
@@ -101,8 +103,48 @@ def get_top(n: int = Query(10, ge=1, le=500)):
 
 @app.get("/movie")
 def get_movie(title: str):
-    return DATA["global"].get(title, {})
+    movie = DATA["global"].get(title, {})
+    if movie and "topics" in movie:
+        movie["topics"] = sorted(
+            movie["topics"],
+            key=lambda t: t["downloads"],
+            reverse=True
+        )
+    return movie
 
 
 
 load_cache()
+
+
+@app.get("/forums")
+def list_forums():
+    return {
+        "count": len(DATA["forums"]),
+        "forums": list(DATA["forums"].keys())
+    }
+
+
+@app.delete("/forum")
+def delete_forum(url: str):
+    if url not in DATA["forums"]:
+        return {"status": "not_found", "url": url}
+    del DATA["forums"][url]
+    rebuild_global()
+    save_cache()
+    return {
+        "status": "deleted",
+        "url": url,
+        "forums": len(DATA["forums"]),
+        "items": len(DATA["global"])
+    }
+
+
+@app.post("/reset")
+def reset_all():
+    global DATA, STATUS, LAST_URL
+    DATA = {"forums": {}, "global": {}}
+    STATUS = "idle"
+    LAST_URL = None
+    save_cache()
+    return {"status": "reset", "forums": 0, "items": 0}
