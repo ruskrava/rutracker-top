@@ -1,3 +1,19 @@
+def rebuild_global():
+    merged = {}
+    for forum_data in DATA["forums"].values():
+        for title, info in forum_data.items():
+            m = merged.setdefault(title, {"downloads": 0, "topics": {}})
+            m["downloads"] += info["downloads"]
+            for t in info["topics"]:
+                m["topics"][t["url"]] = t["downloads"]
+
+    DATA["global"] = {
+        title: {
+            "downloads": data["downloads"],
+            "topics": [{"url": u, "downloads": d} for u, d in data["topics"].items()],
+        }
+        for title, data in merged.items()
+    }
 from fastapi import FastAPI, Query
 from app.parser import parse_forum_aggregated
 import threading
@@ -88,20 +104,5 @@ def get_movie(title: str):
     return DATA["global"].get(title, {})
 
 
-load_cache()
-def rebuild_global():
-    merged = {}
-    for forum_data in DATA["forums"].values():
-        for title, info in forum_data.items():
-            m = merged.setdefault(title, {"downloads": 0, "topics": {}})
-            m["downloads"] += info["downloads"]
-            for t in info["topics"]:
-                m["topics"][t["url"]] = t["downloads"]
 
-    DATA["global"] = {
-        title: {
-            "downloads": data["downloads"],
-            "topics": [{"url": u, "downloads": d} for u, d in data["topics"].items()],
-        }
-        for title, data in merged.items()
-    }
+load_cache()
