@@ -211,3 +211,7 @@ def schedule_disable():
 
 load_cache()
 threading.Thread(target=scheduler_loop, daemon=True).start()
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "rutracker-top"}
