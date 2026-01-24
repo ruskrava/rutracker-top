@@ -1,3 +1,15 @@
+import logging
+
+logging.basicConfig(
+
+    level=logging.INFO,
+
+    format="%(asctime)s [%(levelname)s] %(message)s"
+
+)
+
+logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI, Query
 from app.parser import parse_forum_aggregated
 import threading
@@ -59,6 +71,7 @@ def rebuild_global():
 
 
 def load_cache():
+    logger.info("Loading cache from disk")
     global DATA
     if not os.path.exists(DATA_PATH):
         return
@@ -76,14 +89,17 @@ def load_cache():
 
 
 def save_cache():
+    logger.info("Saving cache to disk")
     with data_lock:
         tmp = DATA_PATH + ".tmp"
         with open(tmp, "wb") as f:
             pickle.dump(DATA, f)
         os.replace(tmp, DATA_PATH)
+        logger.info("Cache saved successfully")
 
 
 def background_parse(url: str):
+    logger.info("Parsing started: %s", url)
     global STATUS, LAST_URL
 
     with data_lock:
@@ -98,26 +114,34 @@ def background_parse(url: str):
             rebuild_global()
             save_cache()
             STATUS = "done"
+            logger.info("Parsing done: %s", url)
     except Exception as e:
+        logger.error("Parsing failed: %s", url, exc_info=True)
         with data_lock:
             STATUS = f"error: {e}"
 
 
 def scheduler_loop():
+    logger.info("Scheduler loop started")
     while True:
         time.sleep(SCHEDULER_INTERVAL)
+        logger.info("Scheduler tick")
         if not SCHEDULER_ENABLED:
+            logger.info("Scheduler skipped (disabled)")
             continue
         if STATUS != "idle":
+            logger.info("Scheduler skipped (busy)")
             continue
 
         urls = list(DATA["forums"].keys())
         for url in urls:
             if STATUS != "idle":
+                logger.info("Scheduler skipped (busy)")
                 break
             try:
                 background_parse(url)
             except Exception:
+                logger.error("Scheduler error", exc_info=True)
                 pass
 
 
