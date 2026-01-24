@@ -16,7 +16,10 @@ DATA_PATH = "data/cache.pkl"
 
 os.makedirs("data", exist_ok=True)
 
-# Scheduler config (ENV-based, docker-friendly)
+# Thread safety
+data_lock = threading.RLock()
+
+# Scheduler config (ENV-based)
 SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
 SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "3600"))
 
@@ -34,21 +37,25 @@ def validate_forum_url(url: str) -> bool:
 
 
 def rebuild_global():
-    merged = {}
-    for forum_data in DATA["forums"].values():
-        for title, info in forum_data.items():
-            m = merged.setdefault(title, {"downloads": 0, "topics": {}})
-            m["downloads"] += info["downloads"]
-            for t in info["topics"]:
-                m["topics"][t["url"]] = t["downloads"]
+    with data_lock:
+        merged = {}
+        for forum_data in DATA["forums"].values():
+            for title, info in forum_data.items():
+                m = merged.setdefault(title, {"downloads": 0, "topics": {}})
+                m["downloads"] += info["downloads"]
+                for t in info["topics"]:
+                    m["topics"][t["url"]] = t["downloads"]
 
-    DATA["global"] = {
-        title: {
-            "downloads": data["downloads"],
-            "topics": [{"url": u, "downloads": d} for u, d in data["topics"].items()],
+        DATA["global"] = {
+            title: {
+                "downloads": data["downloads"],
+                "topics": [
+                    {"url": u, "downloads": d}
+                    for u, d in data["topics"].items()
+                ],
+            }
+            for title, data in merged.items()
         }
-        for title, data in merged.items()
-    }
 
 
 def load_cache():
@@ -69,23 +76,31 @@ def load_cache():
 
 
 def save_cache():
-    tmp = DATA_PATH + ".tmp"
-    with open(tmp, "wb") as f:
-        pickle.dump(DATA, f)
-    os.replace(tmp, DATA_PATH)
+    with data_lock:
+        tmp = DATA_PATH + ".tmp"
+        with open(tmp, "wb") as f:
+            pickle.dump(DATA, f)
+        os.replace(tmp, DATA_PATH)
 
 
 def background_parse(url: str):
     global STATUS, LAST_URL
-    STATUS = "running"
-    LAST_URL = url
+
+    with data_lock:
+        STATUS = "running"
+        LAST_URL = url
+
     try:
-        DATA["forums"][url] = parse_forum_aggregated(url)
-        rebuild_global()
-        save_cache()
-        STATUS = "done"
+        result = parse_forum_aggregated(url)
+
+        with data_lock:
+            DATA["forums"][url] = result
+            rebuild_global()
+            save_cache()
+            STATUS = "done"
     except Exception as e:
-        STATUS = f"error: {e}"
+        with data_lock:
+            STATUS = f"error: {e}"
 
 
 def scheduler_loop():
@@ -95,6 +110,7 @@ def scheduler_loop():
             continue
         if STATUS != "idle":
             continue
+
         urls = list(DATA["forums"].keys())
         for url in urls:
             if STATUS != "idle":
@@ -111,81 +127,96 @@ def start_parse(url: str = Query(..., description="Forum URL")):
         return {"status": "error", "message": "invalid forum url"}
     if STATUS == "running":
         return {"status": STATUS, "message": "Already running"}
-    threading.Thread(target=background_parse, args=(url,), daemon=True).start()
+    threading.Thread(
+        target=background_parse, args=(url,), daemon=True
+    ).start()
     return {"status": "started"}
 
 
 @app.get("/status")
 def get_status():
-    return {
-        "status": STATUS,
-        "forums": len(DATA["forums"]),
-        "items": len(DATA["global"]),
-        "last_url": LAST_URL,
-    }
+    with data_lock:
+        return {
+            "status": STATUS,
+            "forums": len(DATA["forums"]),
+            "items": len(DATA["global"]),
+            "last_url": LAST_URL,
+        }
 
 
 @app.get("/top")
 def get_top(n: int = Query(10, ge=1, le=500)):
-    top = sorted(
-        DATA["global"].items(),
-        key=lambda x: x[1]["downloads"],
-        reverse=True
-    )[:n]
-    return [
-        {"rank": i + 1, "title": title, "downloads": info["downloads"]}
-        for i, (title, info) in enumerate(top)
-    ]
+    with data_lock:
+        top = sorted(
+            DATA["global"].items(),
+            key=lambda x: x[1]["downloads"],
+            reverse=True
+        )[:n]
+
+        return [
+            {"rank": i + 1, "title": title, "downloads": info["downloads"]}
+            for i, (title, info) in enumerate(top)
+        ]
 
 
 @app.get("/movie")
 def get_movie(title: str):
-    movie = DATA["global"].get(title, {})
+    with data_lock:
+        movie = DATA["global"].get(title, {})
+
     if movie and "topics" in movie:
         movie["topics"] = sorted(
             movie["topics"],
             key=lambda t: t["downloads"],
             reverse=True
         )
+
     return movie
 
 
 @app.get("/forums")
 def list_forums():
-    return {
-        "count": len(DATA["forums"]),
-        "forums": list(DATA["forums"].keys())
-    }
+    with data_lock:
+        return {
+            "count": len(DATA["forums"]),
+            "forums": list(DATA["forums"].keys())
+        }
 
 
 @app.delete("/forum")
 def delete_forum(url: str):
     if not validate_forum_url(url):
         return {"status": "error", "message": "invalid forum url"}
-    if url not in DATA["forums"]:
-        return {"status": "not_found", "url": url}
-    del DATA["forums"][url]
+    with data_lock:
+        if url not in DATA["forums"]:
+            return {"status": "not_found", "url": url}
+        del DATA["forums"][url]
+
     rebuild_global()
     save_cache()
-    return {
-        "status": "deleted",
-        "url": url,
-        "forums": len(DATA["forums"]),
-        "items": len(DATA["global"])
-    }
+
+    with data_lock:
+        return {
+            "status": "deleted",
+            "url": url,
+            "forums": len(DATA["forums"]),
+            "items": len(DATA["global"])
+        }
 
 
 @app.post("/reset")
 def reset_all():
     global DATA, STATUS, LAST_URL
-    DATA = {"forums": {}, "global": {}}
-    STATUS = "idle"
-    LAST_URL = None
+    with data_lock:
+        DATA = {"forums": {}, "global": {}}
+        STATUS = "idle"
+        LAST_URL = None
+
     save_cache()
     return {"status": "reset", "forums": 0, "items": 0}
 
 
-# Scheduler control (runtime)
+# Scheduler control
 @app.get("/schedule/status")
 def schedule_status():
     return {
@@ -211,6 +242,7 @@ def schedule_disable():
 
 load_cache()
 threading.Thread(target=scheduler_loop, daemon=True).start()
+
 
 @app.get("/health")
 def health():
