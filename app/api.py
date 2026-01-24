@@ -20,6 +20,9 @@ import re
 
 app = FastAPI(title="Rutracker Top API")
 
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 DATA = {"forums": {}, "global": {}}
 STATUS = "idle"
 LAST_URL = None
