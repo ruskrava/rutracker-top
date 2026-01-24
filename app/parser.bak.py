@@ -140,30 +140,3 @@ def parse_forum_with_topics(base_url: str) -> dict[str, dict]:
                 )
 
     return films
-
-def parse_forum_aggregated(base_url: str) -> dict[str, dict]:
-    session = requests.Session()
-    session.headers.update(HEADERS)
-
-    total_pages = detect_total_pages(base_url)
-    films: dict[str, dict] = {}
-
-    def worker(page: int):
-        start = (page - 1) * PER_PAGE
-        url = f"{base_url}&start={start}"
-        html = get_html(session, url)
-        return parse_page_with_link(html)
-
-    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
-        futures = [executor.submit(worker, p) for p in range(1, total_pages + 1)]
-        for f in as_completed(futures):
-            for title, downloads, link in f.result():
-                if title not in films:
-                    films[title] = {"downloads": 0, "topics": []}
-                films[title]["downloads"] += downloads
-                films[title]["topics"].append({
-                    "url": link,
-                    "downloads": downloads
-                })
-
-    return films
