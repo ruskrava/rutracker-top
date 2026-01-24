@@ -1,3 +1,25 @@
+from fastapi import FastAPI, Query
+from app.parser import parse_forum_aggregated
+import threading
+import pickle
+import os
+import time
+
+app = FastAPI(title="Rutracker Top API")
+
+DATA = {"forums": {}, "global": {}}
+STATUS = "idle"
+LAST_URL = None
+
+DATA_PATH = "data/cache.pkl"
+
+os.makedirs("data", exist_ok=True)
+
+# Scheduler config (ENV-based, docker-friendly)
+SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
+SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "3600"))
+
+
 def rebuild_global():
     merged = {}
     for forum_data in DATA["forums"].values():
@@ -14,22 +36,6 @@ def rebuild_global():
         }
         for title, data in merged.items()
     }
-from fastapi import FastAPI, Query
-from app.parser import parse_forum_aggregated
-import threading
-import pickle, os
-
-app = FastAPI(title="Rutracker Top API")
-
-DATA = {"forums": {}, "global": {}}
-STATUS = "idle"
-LAST_URL = None
-
-DATA_PATH = "data/cache.pkl"
-
-os.makedirs("data", exist_ok=True)
-
-
 
 
 def load_cache():
@@ -40,7 +46,6 @@ def load_cache():
         with open(DATA_PATH, "rb") as f:
             raw = pickle.load(f)
 
-        # old single-forum format
         if "forums" not in raw:
             DATA = {"forums": {"legacy": raw}, "global": {}}
             rebuild_global()
@@ -68,6 +73,23 @@ def background_parse(url: str):
         STATUS = "done"
     except Exception as e:
         STATUS = f"error: {e}"
+
+
+def scheduler_loop():
+    while True:
+        time.sleep(SCHEDULER_INTERVAL)
+        if not SCHEDULER_ENABLED:
+            continue
+        if STATUS != "idle":
+            continue
+        urls = list(DATA["forums"].keys())
+        for url in urls:
+            if STATUS != "idle":
+                break
+            try:
+                background_parse(url)
+            except Exception:
+                pass
 
 
 @app.post("/parse")
@@ -113,10 +135,6 @@ def get_movie(title: str):
     return movie
 
 
-
-load_cache()
-
-
 @app.get("/forums")
 def list_forums():
     return {
@@ -148,3 +166,33 @@ def reset_all():
     LAST_URL = None
     save_cache()
     return {"status": "reset", "forums": 0, "items": 0}
+
+
+# Scheduler control (runtime)
+@app.get("/schedule/status")
+def schedule_status():
+    return {
+        "enabled": SCHEDULER_ENABLED,
+        "interval": SCHEDULER_INTERVAL,
+    }
+
+
+@app.post("/schedule/enable")
+def schedule_enable(interval: int = Query(..., ge=60)):
+    global SCHEDULER_ENABLED, SCHEDULER_INTERVAL
+    SCHEDULER_INTERVAL = interval
+    SCHEDULER_ENABLED = True
+    return {"enabled": True, "interval": SCHEDULER_INTERVAL}
+
+
+@app.post("/schedule/disable")
+def schedule_disable():
+    global SCHEDULER_ENABLED
+    SCHEDULER_ENABLED = False
+    return {"enabled": False}
+
+
+load_cache()
+
+# start scheduler thread (always running, behavior controlled via flags)
+threading.Thread(target=scheduler_loop, daemon=True).start()
