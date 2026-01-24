@@ -5,3 +5,6 @@ __pycache__/
 data/
 .idea/
 .vscode/
+
+*.bak
+*.bak.py
