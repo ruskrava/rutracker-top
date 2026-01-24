@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query
 from typing import Dict
 from app.parser import parse_forum, parse_forum_with_topics
 import threading
+import pickle, os
 
 app = FastAPI(title="Rutracker Top API")
 
@@ -9,6 +10,28 @@ DATA: Dict[str, int] = {}
 DATA_V2 = {}
 STATUS = "idle"
 LAST_URL = None
+
+DATA_PATH = "data/cache.pkl"
+
+
+def load_cache():
+    global DATA, DATA_V2
+    if not os.path.exists(DATA_PATH):
+        return
+    try:
+        with open(DATA_PATH, "rb") as f:
+            obj = pickle.load(f)
+            DATA = obj.get("DATA") or obj.get("data", {})
+            DATA_V2 = obj.get("DATA_V2") or obj.get("data_v2", {})
+    except Exception:
+        pass
+
+
+def save_cache():
+    tmp = DATA_PATH + ".tmp"
+    with open(tmp, "wb") as f:
+        pickle.dump({"DATA": DATA, "DATA_V2": DATA_V2}, f)
+    os.replace(tmp, DATA_PATH)
 
 
 def background_parse(url: str):
@@ -18,6 +41,7 @@ def background_parse(url: str):
     try:
         DATA = parse_forum(url)
         DATA_V2 = parse_forum_with_topics(url)
+        save_cache()
         STATUS = "done"
     except Exception as e:
         STATUS = f"error: {e}"
@@ -41,11 +65,7 @@ def get_status():
 def get_top(n: int = Query(10, ge=1, le=500)):
     top = sorted(DATA.items(), key=lambda x: x[1], reverse=True)[:n]
     return [
-        {
-            "rank": i + 1,
-            "title": title,
-            "downloads": cnt,
-        }
+        {"rank": i + 1, "title": title, "downloads": cnt}
         for i, (title, cnt) in enumerate(top)
     ]
 
@@ -55,10 +75,8 @@ def get_top_v2(n: int = Query(10, ge=1, le=500)):
     if not DATA_V2:
         return []
 
-    data = DATA_V2
-
     top = sorted(
-        data.items(),
+        DATA_V2.items(),
         key=lambda x: x[1]["downloads"],
         reverse=True
     )[:n]
@@ -72,5 +90,7 @@ def get_top_v2(n: int = Query(10, ge=1, le=500)):
             "downloads": info["downloads"],
             "best_topic_url": best["url"],
         })
-
     return result
+
+
+load_cache()
