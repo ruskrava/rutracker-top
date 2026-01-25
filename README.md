@@ -41,30 +41,23 @@ The HTTP API acts as an internal layer used by the web interface.
 
 ## Quick start (Docker — recommended)
 
-The service is distributed as a ready-to-run Docker image via
-GitHub Container Registry.
-
-Requirements:
-- Docker
-
 Run the service with a single command:
 
+```bash
+docker run -d -p 8000:8000 -v "$(pwd)/data:/app/data" --name rutracker-top ghcr.io/ruskrava/rutracker-top:1.0.0
+```
+
+Optional multi-line form (execute as ONE command):
+
+```bash
 docker run -d \
   -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
+  -v "$(pwd)/data:/app/data" \
   --name rutracker-top \
   ghcr.io/ruskrava/rutracker-top:1.0.0
+```
 
-After startup:
-
-Web UI:
-http://localhost:8000/static/index.html
-
-API:
-http://localhost:8000
-
-All data is stored in ./data/cache.pkl and persists across container restarts.
-
+⚠️ Use the single-line command for copy-paste.
 
 ---
 
