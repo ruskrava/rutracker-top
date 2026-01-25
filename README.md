@@ -53,7 +53,7 @@ docker run -d \
   -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   --name rutracker-top \
-  ghcr.io/ruskrava/rutracker-top:latest
+  ghcr.io/ruskrava/rutracker-top:1.0.0
 
 After startup:
 
@@ -64,6 +64,7 @@ API:
 http://localhost:8000
 
 All data is stored in ./data/cache.pkl and persists across container restarts.
+
 
 ---
 
