@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  rutracker-top:
+    build: .
+    container_name: rutracker-top
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      SCHEDULER_ENABLED: "false"
+      SCHEDULER_INTERVAL: "3600"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
