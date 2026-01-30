@@ -1,26 +1,33 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Rutracker Top</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+
 <header>
   <h1>Rutracker Top</h1>
-  <span>Status: <b id="status-badge">?</b></span>
+  <div>Status: <span id="status-badge"></span></div>
   <nav>
-    <a href="/static/forums.html">Forums</a> |
+    <a href="/static/forums.html">Forums</a>
     <a href="/static/settings.html">Settings</a>
   </nav>
 </header>
-<main>
-  <table border="1">
-    <thead>
-      <tr><th>#</th><th>Title</th><th>Downloads</th></tr>
-    </thead>
-    <tbody id="top-table"></tbody>
-  </table>
-</main>
+
+<table>
+  <thead>
+    <tr>
+      <th class="rank">#</th>
+      <th class="title">Title</th>
+      <th class="downloads">Downloads</th>
+    </tr>
+  </thead>
+  <tbody id="top-table"></tbody>
+</table>
+
 <script src="/static/app.js"></script>
 </body>
 </html>

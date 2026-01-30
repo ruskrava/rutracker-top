@@ -1,4 +1,10 @@
-/* app.js — UI for rutracker-top */
+/* app.js — UI logic only (scroll-based infinite) */
+
+const PAGE_LIMIT = 100;
+
+let offset = 0;
+let loading = false;
+let hasMore = true;
 
 async function api(url, opts = {}) {
   const r = await fetch(url, opts);
@@ -10,7 +16,7 @@ function qs(id) {
   return document.getElementById(id);
 }
 
-/* -------- STATUS -------- */
+/* ---------- STATUS ---------- */
 async function loadStatus() {
   const el = qs("status-badge");
   if (!el) return;
@@ -18,30 +24,61 @@ async function loadStatus() {
   el.textContent = s.status;
 }
 
-/* -------- TOP -------- */
-async function loadTop() {
+/* ---------- TOP ---------- */
+async function loadNextTop() {
+  if (loading || !hasMore) return;
+  loading = true;
+
+  const data = await api(`/top?offset=${offset}&limit=${PAGE_LIMIT}`);
   const tbody = qs("top-table");
-  if (!tbody) return;
+  const frag = document.createDocumentFragment();
 
-  const data = await api("/top?n=50");
-  tbody.innerHTML = "";
-
-  data.forEach(row => {
+  data.items.forEach(row => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${row.rank}</td>
-      <td>
+      <td class="rank">${row.rank}</td>
+      <td class="title">
         <a href="/static/movie.html?title=${encodeURIComponent(row.title)}">
           ${row.title}
         </a>
       </td>
-      <td>${row.downloads}</td>
+      <td class="downloads">${row.downloads}</td>
     `;
-    tbody.appendChild(tr);
+    frag.appendChild(tr);
+  });
+
+  tbody.appendChild(frag);
+
+  offset += data.items.length;
+  hasMore = data.has_more;
+
+  if (!hasMore) showEndOfList();
+
+  loading = false;
+}
+
+function showEndOfList() {
+  if (qs("end-of-list")) return;
+  const div = document.createElement("div");
+  div.id = "end-of-list";
+  div.textContent = "Конец списка";
+  qs("top-table").parentElement.appendChild(div);
+}
+
+/* ---------- SCROLL ---------- */
+function bindScroll() {
+  window.addEventListener("scroll", () => {
+    if (!hasMore || loading) return;
+    const nearBottom =
+      window.innerHeight + window.scrollY >=
+      document.body.offsetHeight - 200;
+    if (nearBottom) {
+      loadNextTop().catch(console.error);
+    }
   });
 }
 
-/* -------- MOVIE -------- */
+/* ---------- MOVIE ---------- */
 async function loadMovie() {
   const titleEl = qs("movie-title");
   if (!titleEl) return;
@@ -61,14 +98,16 @@ async function loadMovie() {
   (data.topics || []).forEach(t => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${t.downloads}</td>
-      <td><a href="${t.url}" target="_blank">${t.url}</a></td>
+      <td class="downloads">${t.downloads}</td>
+      <td class="title">
+        <a href="${t.url}" target="_blank">${t.url}</a>
+      </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-/* -------- FORUMS -------- */
+/* ---------- FORUMS ---------- */
 async function loadForums() {
   const list = qs("forums-list");
   if (!list) return;
@@ -112,7 +151,7 @@ function bindAddForum() {
   };
 }
 
-/* -------- SCHEDULER -------- */
+/* ---------- SCHEDULER ---------- */
 async function loadScheduler() {
   const en = qs("scheduler-enabled");
   const it = qs("scheduler-interval");
@@ -143,16 +182,21 @@ function bindScheduler() {
   }
 }
 
-/* -------- INIT -------- */
+/* ---------- INIT ---------- */
 (async function init() {
   try {
     await loadStatus();
-    await loadTop();
     await loadMovie();
     await loadForums();
     await loadScheduler();
     bindAddForum();
     bindScheduler();
+
+    const tbody = qs("top-table");
+    if (tbody) {
+      await loadNextTop();
+      bindScroll();
+    }
   } catch (e) {
     alert("API error: " + e.message);
   }

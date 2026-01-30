@@ -1,26 +1,23 @@
 import logging
-
-logging.basicConfig(
-
-    level=logging.INFO,
-
-    format="%(asctime)s [%(levelname)s] %(message)s"
-
-)
-
-logger = logging.getLogger(__name__)
-
-from fastapi import FastAPI, Query
-from app.parser import parse_forum_aggregated
 import threading
 import pickle
 import os
 import time
 import re
 
+from fastapi import FastAPI, Query
+from fastapi.staticfiles import StaticFiles
+
+from app.parser import parse_forum_aggregated
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Rutracker Top API")
 
-from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 DATA = {"forums": {}, "global": {}}
@@ -28,15 +25,15 @@ STATUS = "idle"
 LAST_URL = None
 
 DATA_PATH = "data/cache.pkl"
-
 os.makedirs("data", exist_ok=True)
 
-# Thread safety
 data_lock = threading.RLock()
 
-# Scheduler config (ENV-based)
 SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
 SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "3600"))
+
+TOP_DEFAULT_LIMIT = 50
+TOP_MAX_LIMIT = 1000
 
 
 def validate_forum_url(url: str) -> bool:
@@ -128,28 +125,22 @@ def scheduler_loop():
     logger.info("Scheduler loop started")
     while True:
         time.sleep(SCHEDULER_INTERVAL)
-        logger.info("Scheduler tick")
         if not SCHEDULER_ENABLED:
-            logger.info("Scheduler skipped (disabled)")
             continue
         if STATUS != "idle":
-            logger.info("Scheduler skipped (busy)")
             continue
 
-        urls = list(DATA["forums"].keys())
-        for url in urls:
+        for url in list(DATA["forums"].keys()):
             if STATUS != "idle":
-                logger.info("Scheduler skipped (busy)")
                 break
             try:
                 background_parse(url)
             except Exception:
                 logger.error("Scheduler error", exc_info=True)
-                pass
 
 
 @app.post("/parse")
-def start_parse(url: str = Query(..., description="Forum URL")):
+def start_parse(url: str = Query(...)):
     if not validate_forum_url(url):
         return {"status": "error", "message": "invalid forum url"}
     if STATUS == "running":
@@ -172,18 +163,36 @@ def get_status():
 
 
 @app.get("/top")
-def get_top(n: int = Query(10, ge=1, le=500)):
+def get_top(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(TOP_DEFAULT_LIMIT, ge=1, le=TOP_MAX_LIMIT),
+):
     with data_lock:
-        top = sorted(
+        items = sorted(
             DATA["global"].items(),
             key=lambda x: x[1]["downloads"],
             reverse=True
-        )[:n]
+        )
 
-        return [
-            {"rank": i + 1, "title": title, "downloads": info["downloads"]}
-            for i, (title, info) in enumerate(top)
-        ]
+    total = len(items)
+    slice_ = items[offset: offset + limit]
+
+    result = [
+        {
+            "rank": offset + i + 1,
+            "title": title,
+            "downloads": info["downloads"],
+        }
+        for i, (title, info) in enumerate(slice_)
+    ]
+
+    return {
+        "items": result,
+        "offset": offset,
+        "limit": limit,
+        "total": total,
+        "has_more": offset + limit < total,
+    }
 
 
 @app.get("/movie")
@@ -243,7 +252,6 @@ def reset_all():
     return {"status": "reset", "forums": 0, "items": 0}
 
 
-# Scheduler control
 @app.get("/schedule/status")
 def schedule_status():
     return {

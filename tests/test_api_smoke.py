@@ -1,15 +1,23 @@
-import requests
+from fastapi.testclient import TestClient
+from app.api import app
 
-BASE = "http://127.0.0.1:8000"
+client = TestClient(app)
+
 
 def test_status():
-    r = requests.get(f"{BASE}/status")
+    r = client.get("/status")
     assert r.status_code == 200
 
-def test_top():
-    r = requests.get(f"{BASE}/top?n=3")
-    assert r.status_code == 200
 
-def test_movie():
-    r = requests.get(f"{BASE}/movie", params={"title": "Дюна"})
+def test_top_available():
+    r = client.get("/top")
+    assert r.status_code == 200
+    data = r.json()
+    assert "items" in data
+    assert "total" in data
+    assert "has_more" in data
+
+
+def test_movie_available():
+    r = client.get("/movie", params={"title": "Дюна"})
     assert r.status_code == 200

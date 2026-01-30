@@ -1,0 +1,86 @@
+/* style.css — unified style for TOP, Movie, Forums (mobile-first) */
+
+body {
+  font-size: 16px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 12px;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 8px 0;
+}
+
+a {
+  font-size: 16px;
+}
+
+/* ---------- HEADER / NAV ---------- */
+header {
+  margin-bottom: 12px;
+}
+
+nav a {
+  margin-right: 12px;
+}
+
+/* ---------- TABLES (GLOBAL) ---------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 8px;
+}
+
+th, td {
+  padding: 8px 6px;
+  vertical-align: top;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+td {
+  font-size: 16px;
+}
+
+/* ---------- COLUMNS ---------- */
+th.rank, td.rank {
+  width: 2.2em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+th.downloads, td.downloads {
+  width: 5em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+th.title, td.title {
+  width: auto;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- LISTS (FORUMS) ---------- */
+ul {
+  padding-left: 18px;
+}
+
+li {
+  margin: 6px 0;
+  font-size: 16px;
+}
+
+/* ---------- END OF LIST ---------- */
+#end-of-list {
+  text-align: center;
+  padding: 16px;
+  font-size: 15px;
+  color: #666;
+}
