@@ -1,193 +1,174 @@
 # Rutracker Top
 
-Rutracker Top is a FastAPI-based service for parsing RuTracker forums and building
-aggregated TOP movie lists based on download statistics.
+Version: 1.1.0
 
-The project focuses on:
-- background forum parsing
-- fast access to aggregated data
-- persistence across restarts
-- simple and controllable architecture without a database
+Rutracker Top is a self-hosted FastAPI service that parses selected RuTracker forum sections and builds aggregated TOP movie lists based on download statistics.
+
+The service is designed for local or LAN deployment.
 
 ---
 
-## What is this
-
-The service parses selected RuTracker forum sections, aggregates statistics for
-the same movies across multiple topics and forums, and exposes an HTTP API for
-retrieving TOP lists and detailed movie information.
-
-The project was originally designed as a local self-hosted service.
-The HTTP API acts as an internal layer used by the web interface.
-
----
-
-## Current features (implemented)
+## Features
 
 - Multi-forum parsing
-- Global aggregation across all forums
+- Global aggregation across all added forums
 - Topic deduplication by URL
-- Background parsing using worker threads
-- Thread-safe data access (threading.RLock)
-- Persistent on-disk cache (pickle)
-- Atomic cache saving
+- Background parsing (threaded)
+- Thread-safe in-memory storage (RLock)
+- Persistent cache (pickle, atomic save)
 - Fast startup with cache restore
-- Built-in scheduler
-- Runtime scheduler control via API
-- Forum management via API
-- Health-check endpoint
+- Built-in scheduler (runtime configurable)
+- REST API (v1 frozen contract)
+- Mobile-first web UI with infinite scroll
+- Docker-ready deployment
+- Health endpoint for monitoring
 
 ---
 
-## Quick start (Docker — recommended)
+## Quick Start (Docker)
 
-Run the service with a single command:
+Create a data directory:
 
-```bash
-docker run -d -p 8000:8000 -v "$(pwd)/data:/app/data" --name rutracker-top ghcr.io/ruskrava/rutracker-top:1.0.0
-```
+~~bash
+mkdir data
+~~
 
-Optional multi-line form (execute as ONE command):
+Run the container:
 
-```bash
+~~bash
 docker run -d \
   -p 8000:8000 \
   -v "$(pwd)/data:/app/data" \
   --name rutracker-top \
-  ghcr.io/ruskrava/rutracker-top:1.0.0
-```
+  ghcr.io/ruskrava/rutracker-top:1.1.0
+~~
 
-⚠️ Use the single-line command for copy-paste.
+Open in browser:
+
+http://<SERVER_IP>:8000/static/index.html
 
 ---
 
-## API
+## Docker Compose
 
-POST /parse?url=...
-Starts background parsing for a forum URL.
+Example docker-compose.yml:
 
-Rules:
-- Only one parsing task can run at a time
-- Concurrent requests are ignored
-- The forum URL is validated before execution
+~~yaml
+services:
+  rutracker-top:
+    image: ghcr.io/ruskrava/rutracker-top:1.1.0
+    container_name: rutracker-top
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      SCHEDULER_ENABLED: "false"
+      SCHEDULER_INTERVAL: "3600"
+    restart: unless-stopped
+~~
 
-Response example:
+Run:
+
+~~bash
+docker compose up -d
+~~
+
+---
+
+## API (v1 — Frozen Contract)
+
+### POST /parse?url=...
+
+Response:
+
+~~json
 { "status": "started" }
+~~
 
----
+### GET /status
 
-GET /status
-Returns current service status.
+~~json
+{
+  "status": "idle | running | done | error",
+  "forums": 2,
+  "items": 500,
+  "last_url": "https://..."
+}
+~~
 
-Fields:
-- status — parsing state (idle, running, done, error)
-- forums — number of tracked forums
-- items — number of aggregated movies
-- last_url — last parsed forum URL
+### GET /top?offset=0&limit=50
 
----
+~~json
+{
+  "items": [
+    {
+      "rank": 1,
+      "title": "[2026] Movie Title",
+      "downloads": 12345
+    }
+  ],
+  "offset": 0,
+  "limit": 50,
+  "total": 1000,
+  "has_more": true
+}
+~~
 
-GET /top?n=10
-Returns TOP-N movies by total download count aggregated across all forums.
+### GET /movie?title=...
 
-Query parameters:
-- n — number of items to return (1–500)
+~~json
+{
+  "downloads": 12345,
+  "topics": [
+    {
+      "url": "...",
+      "downloads": 5000
+    }
+  ]
+}
+~~
 
----
+### GET /forums
 
-GET /movie?title=...
-Returns aggregated data for a single movie:
-- total download count
-- list of topics with URLs and download statistics
+### DELETE /forum?url=...
 
----
+### POST /reset
 
-GET /forums
-Returns the list of currently tracked forums.
+### Scheduler
 
----
+- GET /schedule/status
+- POST /schedule/enable?interval=...
+- POST /schedule/disable
 
-DELETE /forum?url=...
-Removes a forum from the dataset and rebuilds global aggregation.
+Minimum interval: 60 seconds.
 
----
-
-POST /reset
-Resets all data and clears the persistent cache.
-
----
-
-GET /health
-Health-check endpoint for monitoring and container orchestration.
-
----
-
-## Scheduler control
-
-GET /schedule/status  
-POST /schedule/enable?interval=...  
-POST /schedule/disable  
-
-The scheduler:
-- runs in a background thread
-- uses a shared interval for all forums
-- does not start immediately
-- first execution happens after the interval delay
-- skips execution if the service is busy
-
-Minimum allowed interval: 60 seconds.
-
-Scheduler activity is visible only in application logs.
-
+### GET /health
 
 ---
 
 ## Architecture
 
-- FastAPI application
-- Single-process design
-- Background parsing using threads
-- In-memory shared data structures:
-  - DATA["forums"]
-  - DATA["global"]
-- Thread-safe access using RLock
-- Persistent cache stored on disk using pickle
+- FastAPI
+- Single-process service
+- ThreadPoolExecutor for parsing
+- In-memory DATA structure
+- Persistent cache in data/cache.pkl
 - No database
-
-The HTTP API is considered an internal contract.
-API v1 is frozen and should not be changed without explicit agreement.
-
-
----
-
-## Deployment model
-
-The project targets Docker-based deployment.
-
-Recommended setup:
-- single service container
-- persistent volume for data/cache.pkl
-- configuration via environment variables
-- access via local network or reverse proxy
-
-The Docker image is published via GitHub Container Registry.
-
-Local execution without Docker remains supported for development purposes.
 
 ---
 
 ## Limitations
 
-- Single-process service
-- Only one active parsing task at a time
-- Parser is tightly coupled to RuTracker HTML structure
-- No authentication or access control
-- Not intended for public or high-load production usage
+- Single process
+- One active parsing task at a time
+- No authentication
+- Not intended for public high-load usage
+- Depends on RuTracker HTML structure
 
 ---
 
-## Notes
+## Legal Notice
 
-This project does not store or redistribute any content.
-It only processes publicly available statistics and links.
-
+This project does not host or distribute copyrighted content.
+It only processes publicly available metadata and statistics.
