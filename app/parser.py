@@ -1,8 +1,8 @@
 import requests
 import time
+import re
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import defaultdict
 
 PER_PAGE = 50
 WORKERS = 10
@@ -12,6 +12,20 @@ RETRY_DELAY = 2
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
+
+
+def normalize_title(raw: str) -> str:
+    raw = raw.strip()
+
+    match = re.search(r"\[(\d{4}),", raw)
+    year = match.group(1) if match else None
+
+    title_ru = raw.split("/")[0].strip()
+
+    if year:
+        return f"[{year}] {title_ru}"
+
+    return title_ru
 
 
 def get_html(session: requests.Session, url: str) -> str:
@@ -29,29 +43,6 @@ def get_html(session: requests.Session, url: str) -> str:
                 raise last_exc
 
 
-def parse_page(html: str) -> list[tuple[str, int]]:
-    soup = BeautifulSoup(html, "lxml")
-    rows = soup.select("tr.hl-tr")
-    result = []
-
-    for tr in rows:
-        try:
-            td = tr.find_all("td")
-            title = (
-                td[1]
-                .select_one("a.torTopic")
-                .get_text(strip=True)
-                .split("/")[0].strip()
-            )
-            stats = td[3].find_all("p")
-            downloads = int(stats[1].get_text(strip=True).replace(",", ""))
-            result.append((title, downloads))
-        except Exception:
-            continue
-
-    return result
-
-
 def parse_page_with_link(html: str) -> list[tuple[str, int, str]]:
     soup = BeautifulSoup(html, "lxml")
     rows = soup.select("tr.hl-tr")
@@ -61,10 +52,14 @@ def parse_page_with_link(html: str) -> list[tuple[str, int, str]]:
         try:
             td = tr.find_all("td")
             a = td[1].select_one("a.torTopic")
-            title = a.get_text(strip=True).split("/")[0].strip()
+
+            raw_title = a.get_text(" ", strip=True)
+            title = normalize_title(raw_title)
+
             link = "https://rutracker.org/forum/" + a.get("href")
             stats = td[3].find_all("p")
             downloads = int(stats[1].get_text(strip=True).replace(",", ""))
+
             result.append((title, downloads, link))
         except Exception:
             continue

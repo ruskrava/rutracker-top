@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Forums — Rutracker Top</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=111">
 </head>
 <body>
 
@@ -17,14 +17,45 @@
 </header>
 
 <main>
-  <h2>Tracked forums</h2>
 
+  <h2>Tracked forums</h2>
   <ul id="forums-list"></ul>
 
-  <h3>Add forum</h3>
+  <h3>Add forum manually</h3>
   <input id="forum-url" placeholder="Forum URL">
   <button id="add-forum">Add + parse</button>
+
+  <p style="font-size:14px; color:#666;">
+    After adding a forum, parsing may take up to 5 minutes for large sections.<br>
+    Please wait until status becomes "done".
+  </p>
+
+  <hr>
+
+  <h3>Suggested forums</h3>
+  <ul>
+    <li>
+      https://rutracker.org/forum/viewforum.php?f=252
+      <button onclick="quickAdd('https://rutracker.org/forum/viewforum.php?f=252')">Add + parse</button>
+    </li>
+    <li>
+      https://rutracker.org/forum/viewforum.php?f=1950
+      <button onclick="quickAdd('https://rutracker.org/forum/viewforum.php?f=1950')">Add + parse</button>
+    </li>
+    <li>
+      https://rutracker.org/forum/viewforum.php?f=187
+      <button onclick="quickAdd('https://rutracker.org/forum/viewforum.php?f=187')">Add + parse</button>
+    </li>
+  </ul>
+
 </main>
+
+<script>
+function quickAdd(url) {
+  document.getElementById("forum-url").value = url;
+  document.getElementById("add-forum").click();
+}
+</script>
 
 <script src="/static/app.js"></script>
 </body>

@@ -67,6 +67,13 @@ th.title, td.title {
   overflow-wrap: anywhere;
 }
 
+/* Hanging indent ONLY for TOP table */
+#top-table a {
+  display: inline-block;
+  padding-left: 3.5em;
+  text-indent: -3.5em;
+}
+
 /* ---------- LISTS (FORUMS) ---------- */
 ul {
   padding-left: 18px;
