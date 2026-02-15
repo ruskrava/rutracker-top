@@ -1,6 +1,6 @@
 # Rutracker Top
 
-Version: 1.1.0
+**Version: 1.1.0**
 
 Rutracker Top is a self-hosted FastAPI service that parses selected RuTracker forum sections and builds aggregated TOP movie lists based on download statistics.
 
@@ -29,31 +29,33 @@ The service is designed for local or LAN deployment.
 
 Create a data directory:
 
-~~bash
+```bash
 mkdir data
-~~
+```
 
 Run the container:
 
-~~bash
+```bash
 docker run -d \
   -p 8000:8000 \
   -v "$(pwd)/data:/app/data" \
   --name rutracker-top \
   ghcr.io/ruskrava/rutracker-top:1.1.0
-~~
+```
 
 Open in browser:
 
+```
 http://<SERVER_IP>:8000/static/index.html
+```
 
 ---
 
 ## Docker Compose
 
-Example docker-compose.yml:
+Example `docker-compose.yml`:
 
-~~yaml
+```yaml
 services:
   rutracker-top:
     image: ghcr.io/ruskrava/rutracker-top:1.1.0
@@ -66,13 +68,13 @@ services:
       SCHEDULER_ENABLED: "false"
       SCHEDULER_INTERVAL: "3600"
     restart: unless-stopped
-~~
+```
 
 Run:
 
-~~bash
+```bash
 docker compose up -d
-~~
+```
 
 ---
 
@@ -82,24 +84,28 @@ docker compose up -d
 
 Response:
 
-~~json
+```json
 { "status": "started" }
-~~
+```
+
+---
 
 ### GET /status
 
-~~json
+```json
 {
   "status": "idle | running | done | error",
   "forums": 2,
   "items": 500,
   "last_url": "https://..."
 }
-~~
+```
+
+---
 
 ### GET /top?offset=0&limit=50
 
-~~json
+```json
 {
   "items": [
     {
@@ -113,11 +119,13 @@ Response:
   "total": 1000,
   "has_more": true
 }
-~~
+```
+
+---
 
 ### GET /movie?title=...
 
-~~json
+```json
 {
   "downloads": 12345,
   "topics": [
@@ -127,13 +135,27 @@ Response:
     }
   ]
 }
-~~
+```
+
+---
 
 ### GET /forums
 
+Returns list of tracked forums.
+
+---
+
 ### DELETE /forum?url=...
 
+Removes a forum and rebuilds aggregation.
+
+---
+
 ### POST /reset
+
+Clears all data and cache.
+
+---
 
 ### Scheduler
 
@@ -143,7 +165,11 @@ Response:
 
 Minimum interval: 60 seconds.
 
+---
+
 ### GET /health
+
+Health-check endpoint for container monitoring.
 
 ---
 
@@ -153,8 +179,10 @@ Minimum interval: 60 seconds.
 - Single-process service
 - ThreadPoolExecutor for parsing
 - In-memory DATA structure
-- Persistent cache in data/cache.pkl
+- Persistent cache in `data/cache.pkl`
 - No database
+
+API v1 is considered frozen.
 
 ---
 
