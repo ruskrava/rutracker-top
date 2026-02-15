@@ -24,11 +24,21 @@
     Interval: <b id="scheduler-interval">?</b> sec
   </p>
 
-  <input id="interval-input" placeholder="Interval (sec)">
+  <input id="interval-input" placeholder="Interval (seconds, min 60)">
   <button id="scheduler-enable">Enable</button>
   <button id="scheduler-disable">Disable</button>
 
-  <p><i>Scheduler skips parsing if service is busy</i></p>
+  <p style="font-size: 14px; color: #666;">
+    Minimum interval: 60 seconds.<br><br>
+
+    Recommended intervals:<br>
+    • 1 hour = 3600 sec<br>
+    • 6 hours = 21600 sec<br>
+    • 12 hours = 43200 sec<br>
+    • 24 hours = 86400 sec<br><br>
+
+    Scheduler skips parsing if service is busy.
+  </p>
 </main>
 
 <script src="/static/app.js"></script>

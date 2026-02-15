@@ -123,20 +123,27 @@ def background_parse(url: str):
 
 def scheduler_loop():
     logger.info("Scheduler loop started")
+    last_run = 0
+
     while True:
-        time.sleep(SCHEDULER_INTERVAL)
+        time.sleep(1)
+
         if not SCHEDULER_ENABLED:
             continue
-        if STATUS != "idle":
+
+        if STATUS == "running":
+            continue
+
+        now = time.time()
+        if now - last_run < SCHEDULER_INTERVAL:
             continue
 
         for url in list(DATA["forums"].keys()):
-            if STATUS != "idle":
+            if STATUS == "running":
                 break
-            try:
-                background_parse(url)
-            except Exception:
-                logger.error("Scheduler error", exc_info=True)
+            background_parse(url)
+
+        last_run = now
 
 
 @app.post("/parse")
